@@ -1,18 +1,87 @@
 import { useState } from 'react';
+import API_ENDPOINTS from '../config/api';
 
 interface LoginProps {
-  onLogin: (email: string, password: string) => void;
+  onAuth: (payload: {
+    username: string;
+    email: string;
+    password: string;
+    mode: 'login' | 'signup';
+  }) => void;
   onSignUp: () => void;
+  isLoading?: boolean;
+  errorMessage?: string;
 }
 
-export default function Login({ onLogin, onSignUp }: LoginProps) {
+export default function Login({ onAuth, onSignUp, isLoading = false, errorMessage = '' }: LoginProps) {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [authMode, setAuthMode] = useState<'login' | 'signup'>('login');
+  const [localError, setLocalError] = useState('');
+  const [loading, setLoading] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    onLogin(email, password);
+    const username = name.trim();
+    const trimmedEmail = email.trim();
+
+    if (!username) {
+      setLocalError('Please enter a name/username.');
+      return;
+    }
+    if (authMode === 'signup') {
+      if (!trimmedEmail || !trimmedEmail.includes('@')) {
+        setLocalError('Please enter a valid email for sign up.');
+        return;
+      }
+      if (password.length < 6) {
+        setLocalError('Password must be at least 6 characters.');
+        return;
+      }
+    }
+
+    setLocalError('');
+    setLoading(true);
+
+    try {
+      const endpoint = authMode === 'signup' ? API_ENDPOINTS.register : API_ENDPOINTS.login;
+      const payload = authMode === 'signup' 
+        ? { username, email: trimmedEmail, password }
+        : { username, password };
+
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        setLocalError(errorData.detail || `${authMode === 'signup' ? 'Sign up' : 'Login'} failed`);
+        return;
+      }
+
+      const data = await response.json();
+      
+      // Store token if provided
+      if (data.access_token) {
+        localStorage.setItem('access_token', data.access_token);
+      }
+
+      onAuth({
+        username,
+        email: trimmedEmail,
+        password,
+        mode: authMode,
+      });
+    } catch (error) {
+      setLocalError(`Connection error: ${error instanceof Error ? error.message : 'Failed to connect to server'}`);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -64,12 +133,44 @@ export default function Login({ onLogin, onSignUp }: LoginProps) {
         >
           Don&apos;t have an account?{' '}
           <button
-            onClick={onSignUp}
+            type="button"
+            onClick={() => {
+              setAuthMode('signup');
+              onSignUp();
+            }}
             className="font-black cursor-pointer bg-transparent border-none p-0"
             style={{
               fontFamily: 'Avenir, sans-serif',
               fontSize: '20px',
             }}
+          >
+            Sign Up
+          </button>
+        </p>
+
+        <p
+          className="text-center text-black mt-1"
+          style={{
+            fontFamily: 'Avenir, sans-serif',
+            fontSize: '16px',
+            lineHeight: 'normal',
+          }}
+        >
+          Mode:{' '}
+          <button
+            type="button"
+            onClick={() => setAuthMode('login')}
+            className={`cursor-pointer bg-transparent border-none p-0 ${authMode === 'login' ? 'font-bold' : ''}`}
+            style={{ fontFamily: 'Avenir, sans-serif', fontSize: '16px' }}
+          >
+            Login
+          </button>
+          {' / '}
+          <button
+            type="button"
+            onClick={() => setAuthMode('signup')}
+            className={`cursor-pointer bg-transparent border-none p-0 ${authMode === 'signup' ? 'font-bold' : ''}`}
+            style={{ fontFamily: 'Avenir, sans-serif', fontSize: '16px' }}
           >
             Sign Up
           </button>
@@ -138,8 +239,9 @@ export default function Login({ onLogin, onSignUp }: LoginProps) {
           {/* Login button */}
           <button
             type="submit"
+            disabled={loading}
             className="mt-2 px-6 py-2 bg-white border-4 border-black
-              cursor-pointer hover:bg-gray-100 active:scale-95 transition-all duration-200"
+              cursor-pointer hover:bg-gray-100 active:scale-95 transition-all duration-200 disabled:opacity-60"
             style={{
               color: '#040000',
               textAlign: 'center',
@@ -151,9 +253,18 @@ export default function Login({ onLogin, onSignUp }: LoginProps) {
               filter: 'url(#pencil-border)',
             }}
           >
-            login
+            {loading ? 'loading...' : authMode}
           </button>
         </form>
+
+        {(localError || errorMessage) && (
+          <p
+            className="text-center text-red-700 mt-4"
+            style={{ fontFamily: 'Avenir, sans-serif', fontSize: '16px' }}
+          >
+            {localError || errorMessage}
+          </p>
+        )}
       </div>
     </div>
   );

@@ -3,13 +3,22 @@ import { useState } from 'react';
 interface ProfileProps {
   onGoToCanvas: () => void;
   savedDrawings?: string[]; // array of data URLs from saved canvases
+  username?: string;
+  userEmail?: string;
+  userInterests?: string;
 }
 
-export default function Profile({ onGoToCanvas, savedDrawings = [] }: ProfileProps) {
-  const [name, setName] = useState('John Doe');
-  const [email, setEmail] = useState('johndoe@gmail.com');
+export default function Profile({
+  onGoToCanvas,
+  savedDrawings = [],
+  username = '',
+  userEmail = '',
+  userInterests = ''
+}: ProfileProps) {
+  const [name, setName] = useState(username || 'John Doe');
+  const [email, setEmail] = useState(userEmail || 'johndoe@gmail.com');
   const [interests, setInterests] = useState(
-    'aliens, spaceships, fairies, cars, superheroes, soccer, animals, minions, trees, power rangers, legos'
+    userInterests || 'aliens, spaceships, fairies, cars, superheroes, soccer, animals, minions, trees, power rangers, legos'
   );
 
   const font = {
