@@ -1,6 +1,10 @@
 import { useState } from 'react';
 
-export default function Question() {
+interface QuestionProps {
+  onContinue: () => void;
+}
+
+export default function Question({ onContinue }: QuestionProps) {
   const [isHolding, setIsHolding] = useState(false);
 
   return (
@@ -37,7 +41,7 @@ export default function Question() {
         {/* Mic button */}
         <button
           onPointerDown={() => setIsHolding(true)}
-          onPointerUp={() => setIsHolding(false)}
+          onPointerUp={() => { setIsHolding(false); onContinue(); }}
           onPointerLeave={() => setIsHolding(false)}
           className="mt-8 relative cursor-pointer bg-transparent border-none p-0 outline-none"
         >
