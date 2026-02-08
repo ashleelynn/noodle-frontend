@@ -120,6 +120,7 @@ function strokeHitTest(
 interface DrawingBoardProps {
   aiMessage?: string;
   drawingPrompt?: string;
+  initialFreestyle?: boolean;
   onSave?: (dataUrl: string) => void;
   onSpeakMessage?: (message: string) => void;
   onProfile?: () => void;
@@ -128,6 +129,7 @@ interface DrawingBoardProps {
 export default function DrawingBoard({
   aiMessage = 'start drawing! i\'ll give you tips along the way',
   drawingPrompt = 'dinosaur\'s birthday',
+  initialFreestyle = true,
   onSave,
   onSpeakMessage,
   onProfile,
@@ -143,9 +145,13 @@ export default function DrawingBoard({
 
   const [activeTool, setActiveTool] = useState<Tool>('pen');
   const [activeColor, setActiveColor] = useState('#000000');
-  const [isFreestyle, setIsFreestyle] = useState(true);
+  const [isFreestyle, setIsFreestyle] = useState(initialFreestyle);
   const [showColorWheel, setShowColorWheel] = useState(false);
   const [isToggleAnimating, setIsToggleAnimating] = useState(false);
+
+  useEffect(() => {
+    setIsFreestyle(initialFreestyle);
+  }, [initialFreestyle]);
   const isIpad = (() => {
     if (typeof navigator === 'undefined') return false;
     const ua = navigator.userAgent;
