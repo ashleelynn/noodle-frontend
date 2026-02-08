@@ -1,16 +1,21 @@
 import { useState } from 'react'
 import Landing from './components/Landing'
 import Login from './components/Login'
+import Question from './components/Question'
 
-type Page = 'landing' | 'login'
+type Page = 'landing' | 'login' | 'question'
 
 export default function App() {
   const [page, setPage] = useState<Page>('landing')
 
+  if (page === 'question') {
+    return <Question />
+  }
+
   if (page === 'login') {
     return (
       <Login
-        onLogin={(email, password) => console.log('login', email, password)}
+        onLogin={() => setPage('question')}
         onSignUp={() => console.log('sign up clicked')}
       />
     )
