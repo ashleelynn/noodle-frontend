@@ -143,6 +143,9 @@ export default function App() {
       <Profile
         onGoToCanvas={() => setPage('drawing')}
         savedDrawings={savedDrawings}
+        username={currentUser?.username || ''}
+        userEmail={currentUser?.email || ''}
+        userInterests={welcomeTranscript}
       />
     )
   }

@@ -11,15 +11,24 @@ export default function Question({ onContinue }: QuestionProps) {
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   useEffect(() => {
-    // Play welcome audio - try ElevenLabs first, fallback to Web Speech API
+    // Use ElevenLabs Agent only - no fallback
     const playWelcomeAudio = async () => {
       try {
-        // Try ElevenLabs API
-        const response = await fetch('http://localhost:8004/api/voice/welcome/luna');
+        // Use the conversational agent
+        const response = await fetch('http://localhost:8004/api/voice/agent/conversation', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            user_message: 'Start the conversation by asking what I like to draw'
+          })
+        });
+
         const data = await response.json();
 
         if (data.audio_url) {
-          // ElevenLabs audio available
+          // Play ElevenLabs audio
           const audio = new Audio(`http://localhost:8004${data.audio_url}`);
           audioRef.current = audio;
 
@@ -27,36 +36,16 @@ export default function Question({ onContinue }: QuestionProps) {
           audio.onended = () => setIsPlayingAudio(false);
           audio.onerror = () => {
             setIsPlayingAudio(false);
-            // Fallback to Web Speech API if audio fails
-            speakWithWebSpeech(data.message || "Hi friend! I'm Luna! Ready to create something magical?");
+            console.error('Failed to play ElevenLabs audio');
           };
 
           await audio.play();
         } else {
-          // No audio URL, use Web Speech API fallback
-          speakWithWebSpeech(data.message || "Hi friend! I'm Luna! Ready to create something magical?");
+          console.error('No audio URL received from ElevenLabs');
+          setIsPlayingAudio(false);
         }
       } catch (error) {
-        console.error('Failed to fetch welcome audio:', error);
-        // Fallback to Web Speech API
-        speakWithWebSpeech("Hi friend! I'm Luna! Ready to create something magical?");
-      }
-    };
-
-    // Web Speech API fallback
-    const speakWithWebSpeech = (text: string) => {
-      if ('speechSynthesis' in window) {
-        setIsPlayingAudio(true);
-        const utterance = new SpeechSynthesisUtterance(text);
-        utterance.pitch = 1.2; // Higher pitch for Luna
-        utterance.rate = 0.95;
-        utterance.volume = 1.0;
-
-        utterance.onend = () => setIsPlayingAudio(false);
-        utterance.onerror = () => setIsPlayingAudio(false);
-
-        window.speechSynthesis.speak(utterance);
-      } else {
+        console.error('Failed to fetch ElevenLabs audio:', error);
         setIsPlayingAudio(false);
       }
     };
@@ -70,9 +59,6 @@ export default function Question({ onContinue }: QuestionProps) {
       if (audioRef.current) {
         audioRef.current.pause();
         audioRef.current = null;
-      }
-      if ('speechSynthesis' in window) {
-        window.speechSynthesis.cancel();
       }
     };
   }, []);
