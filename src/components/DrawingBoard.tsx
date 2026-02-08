@@ -27,14 +27,18 @@ const TOOLS: { id: Tool; icon: string; label: string }[] = [
 
 interface DrawingBoardProps {
   aiMessage?: string;
+  drawingPrompt?: string;
   onSave?: (dataUrl: string) => void;
   onSpeakMessage?: (message: string) => void;
+  onProfile?: () => void;
 }
 
 export default function DrawingBoard({
   aiMessage = 'start drawing! i\'ll give you tips along the way',
+  drawingPrompt = 'dinosaur\'s birthday',
   onSave,
   onSpeakMessage,
+  onProfile,
 }: DrawingBoardProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const isDrawing = useRef(false);
@@ -153,31 +157,51 @@ export default function DrawingBoard({
           noodle
         </p>
 
-        {/* Right side: toggle + label */}
-        <div className="flex items-center gap-4">
+        {/* Right side: toggle + person icon */}
+        <div className="flex items-center gap-6">
           {/* Toggle */}
           <button
             onClick={() => setIsFreestyle((f) => !f)}
             className="flex items-center gap-3 cursor-pointer bg-transparent border-none p-0"
           >
-            <div className="w-[80px] h-[40px] rounded-[30px] border-[3px] border-black flex items-center px-1 relative">
+            <div
+              className={`w-[80px] h-[40px] rounded-[30px] border-[3px] border-black flex items-center px-1 relative transition-colors duration-200
+                ${isFreestyle ? 'bg-transparent' : 'bg-black'}`}
+            >
               <div
-                className="w-[32px] h-[32px] rounded-full bg-black transition-all duration-200"
+                className={`w-[32px] h-[32px] rounded-full transition-all duration-200
+                  ${isFreestyle ? 'bg-black' : 'bg-white'}`}
                 style={{
                   marginLeft: isFreestyle ? '38px' : '0px',
                 }}
               />
             </div>
             <span
-              className="text-black"
+              className="text-black whitespace-nowrap"
               style={{
                 fontFamily: '"Just Me Again Down Here", cursive',
                 fontSize: '40px',
                 lineHeight: 'normal',
               }}
             >
-              {isFreestyle ? 'freestyle' : 'guided'}
+              {isFreestyle ? 'freestyle' : 'buddy mode'}
             </span>
+          </button>
+
+          {/* Person icon → profile */}
+          <button
+            onClick={onProfile}
+            className="cursor-pointer bg-transparent border-none p-0"
+            title="My profile"
+          >
+            <svg width="53" height="67" viewBox="0 0 53 67" fill="none">
+              <circle cx="26" cy="12" r="10" stroke="black" strokeWidth="3" fill="none"/>
+              <line x1="26" y1="22" x2="26" y2="50" stroke="black" strokeWidth="3"/>
+              <line x1="26" y1="30" x2="10" y2="42" stroke="black" strokeWidth="3"/>
+              <line x1="26" y1="30" x2="42" y2="42" stroke="black" strokeWidth="3"/>
+              <line x1="26" y1="50" x2="14" y2="65" stroke="black" strokeWidth="3"/>
+              <line x1="26" y1="50" x2="38" y2="65" stroke="black" strokeWidth="3"/>
+            </svg>
           </button>
         </div>
       </div>
@@ -186,37 +210,37 @@ export default function DrawingBoard({
       <div className="flex-1 flex relative p-4 pt-6 gap-3 min-h-0">
         {/* Left toolbar */}
         <div className="flex flex-col items-center gap-3 shrink-0">
-          {/* Tool buttons */}
-          <div className="bg-white border-[5px] border-black flex flex-col items-center py-3 px-2 gap-2 w-[70px]">
-            {TOOLS.map((tool) => (
+            {/* Tool buttons */}
+            <div className="bg-white border-[5px] border-black flex flex-col items-center py-3 px-2 gap-2 w-[70px]">
+              {TOOLS.map((tool) => (
+                <button
+                  key={tool.id}
+                  onClick={() => setActiveTool(tool.id)}
+                  className={`w-[50px] h-[50px] flex items-center justify-center cursor-pointer
+                    border-none rounded-sm transition-colors duration-150 p-1
+                    ${activeTool === tool.id ? 'bg-[#ffd000]' : 'bg-transparent hover:bg-gray-100'}`}
+                  title={tool.label}
+                >
+                  <img src={tool.icon} alt={tool.label} className="w-full h-full object-contain" />
+                </button>
+              ))}
+            </div>
+
+            {/* Color swatches */}
+            {COLORS.map((c) => (
               <button
-                key={tool.id}
-                onClick={() => setActiveTool(tool.id)}
-                className={`w-[50px] h-[50px] flex items-center justify-center cursor-pointer
-                  border-none rounded-sm transition-colors duration-150 p-1
-                  ${activeTool === tool.id ? 'bg-[#ffd000]' : 'bg-transparent hover:bg-gray-100'}`}
-                title={tool.label}
-              >
-                <img src={tool.icon} alt={tool.label} className="w-full h-full object-contain" />
-              </button>
+                key={c.color}
+                onClick={() => {
+                  setActiveColor(c.color);
+                  if (activeTool === 'eraser') setActiveTool('pencil');
+                }}
+                className={`w-[28px] h-[28px] rounded-full cursor-pointer border-2 transition-transform duration-150
+                  ${activeColor === c.color ? 'scale-125 border-black' : 'border-transparent hover:scale-110'}`}
+                style={{ backgroundColor: c.color }}
+                title={c.label}
+              />
             ))}
           </div>
-
-          {/* Color swatches */}
-          {COLORS.map((c) => (
-            <button
-              key={c.color}
-              onClick={() => {
-                setActiveColor(c.color);
-                if (activeTool === 'eraser') setActiveTool('pencil');
-              }}
-              className={`w-[28px] h-[28px] rounded-full cursor-pointer border-2 transition-transform duration-150
-                ${activeColor === c.color ? 'scale-125 border-black' : 'border-transparent hover:scale-110'}`}
-              style={{ backgroundColor: c.color }}
-              title={c.label}
-            />
-          ))}
-        </div>
 
         {/* Canvas area */}
         <div className="flex-1 relative min-h-0">
@@ -227,6 +251,22 @@ export default function DrawingBoard({
             className="absolute inset-0 w-full h-full pointer-events-none z-10"
             style={{ padding: '0' }}
           />
+
+          {/* Drawing prompt — buddy mode only */}
+          {!isFreestyle && (
+            <div className="absolute top-0 left-1/2 -translate-x-1/2 z-20 bg-white border-[4px] border-black px-6 py-3">
+              <p
+                className="text-black text-center"
+                style={{
+                  fontFamily: '"Just Me Again Down Here", cursive',
+                  fontSize: '40px',
+                  lineHeight: 'normal',
+                }}
+              >
+                {drawingPrompt}
+              </p>
+            </div>
+          )}
 
           {/* Actual drawing canvas */}
           <div className="absolute inset-[20px] overflow-hidden">
