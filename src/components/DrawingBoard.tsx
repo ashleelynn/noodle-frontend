@@ -266,7 +266,7 @@ export default function DrawingBoard({
             }
           } catch (err) {
             console.error('[TTS] Error with TTS for prompt description:', err);
-            setIsAudioPlaying(false);
+            isAudioPlayingRef.current = false;
           }
         }
       } catch (error) {
