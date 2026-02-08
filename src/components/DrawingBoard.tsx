@@ -5,7 +5,7 @@ type Tool = 'pen' | 'brush' | 'pencil' | 'eraser';
 const TOOL_CONFIG: Record<Tool, { width: number; opacity: number; cap: CanvasLineCap }> = {
   pen: { width: 4, opacity: 1, cap: 'round' },
   brush: { width: 12, opacity: 0.8, cap: 'round' },
-  pencil: { width: 2, opacity: 1, cap: 'round' },
+  pencil: { width: 4, opacity: 1, cap: 'round' },
   eraser: { width: 24, opacity: 1, cap: 'round' },
 };
 
@@ -41,6 +41,7 @@ export default function DrawingBoard({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const isDrawing = useRef(false);
   const lastPos = useRef<{ x: number; y: number } | null>(null);
+  const lastPressure = useRef(1);
 
   const [activeTool, setActiveTool] = useState<Tool>('pen');
   const [activeColor, setActiveColor] = useState('#000000');
@@ -98,12 +99,48 @@ export default function DrawingBoard({
     };
   }, []);
 
+  const getPressure = useCallback((e: React.PointerEvent) => {
+    if (e.pointerType !== 'pen') return 1;
+    return Math.max(0.1, e.pressure || 0.1);
+  }, []);
+
+  const drawPencilGrain = useCallback((
+    ctx: CanvasRenderingContext2D,
+    from: { x: number; y: number },
+    to: { x: number; y: number },
+    color: string,
+    width: number,
+  ) => {
+    const dx = to.x - from.x;
+    const dy = to.y - from.y;
+    const distance = Math.hypot(dx, dy);
+    if (distance < 1) return;
+
+    const dots = Math.max(18, Math.floor(distance * 4.2));
+    const jitter = Math.max(1.4, width * 2.2);
+
+    ctx.save();
+    ctx.fillStyle = color;
+    for (let i = 0; i < dots; i += 1) {
+      const t = i / dots;
+      const x = from.x + dx * t + (Math.random() - 0.5) * jitter;
+      const y = from.y + dy * t + (Math.random() - 0.5) * jitter;
+      const r = 0.3 + Math.random() * 1.2;
+      ctx.globalAlpha = 0.08 + Math.random() * 0.14;
+      ctx.beginPath();
+      ctx.arc(x, y, r, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
+  }, []);
+
   const startDraw = useCallback((e: React.PointerEvent) => {
     isDrawing.current = true;
     lastPos.current = getCanvasPos(e);
+    lastPressure.current = getPressure(e);
     // Capture pointer for smooth drawing
     (e.target as HTMLElement).setPointerCapture(e.pointerId);
-  }, [getCanvasPos]);
+  }, [getCanvasPos, getPressure]);
 
   const draw = useCallback((e: React.PointerEvent) => {
     if (!isDrawing.current || !lastPos.current) return;
@@ -113,23 +150,50 @@ export default function DrawingBoard({
 
     const pos = getCanvasPos(e);
     const config = TOOL_CONFIG[activeTool];
+    const pressure = getPressure(e);
+    const blendedPressure = (lastPressure.current + pressure) / 2;
+
+    let strokeWidth = config.width;
+    let strokeOpacity = config.opacity;
+    let strokeStyle = activeTool === 'eraser' ? '#f4f1ed' : activeColor;
+
+    if (activeTool === 'brush') {
+      strokeWidth = Math.max(4, config.width * (0.35 + blendedPressure * 1.05));
+      strokeOpacity = Math.min(1, 0.3 + blendedPressure * 0.7);
+      if (activeColor.startsWith('#') && activeColor.length === 7) {
+        const r = parseInt(activeColor.slice(1, 3), 16);
+        const g = parseInt(activeColor.slice(3, 5), 16);
+        const b = parseInt(activeColor.slice(5, 7), 16);
+        strokeStyle = `rgba(${r}, ${g}, ${b}, ${strokeOpacity})`;
+      }
+    } else if (activeTool === 'pencil') {
+      strokeWidth = config.width * 0.9;
+      strokeOpacity = 0.72;
+    }
 
     ctx.beginPath();
     ctx.moveTo(lastPos.current.x, lastPos.current.y);
     ctx.lineTo(pos.x, pos.y);
-    ctx.strokeStyle = activeTool === 'eraser' ? '#f4f1ed' : activeColor;
-    ctx.lineWidth = config.width;
+    ctx.strokeStyle = strokeStyle;
+    ctx.lineWidth = strokeWidth;
     ctx.lineCap = config.cap;
-    ctx.globalAlpha = config.opacity;
+    ctx.globalAlpha = activeTool === 'brush' ? 1 : strokeOpacity;
     ctx.stroke();
+
+    if (activeTool === 'pencil') {
+      drawPencilGrain(ctx, lastPos.current, pos, activeColor, strokeWidth);
+    }
+
     ctx.globalAlpha = 1;
 
     lastPos.current = pos;
-  }, [activeTool, activeColor, getCanvasPos]);
+    lastPressure.current = pressure;
+  }, [activeTool, activeColor, drawPencilGrain, getCanvasPos, getPressure]);
 
   const endDraw = useCallback(() => {
     isDrawing.current = false;
     lastPos.current = null;
+    lastPressure.current = 1;
   }, []);
 
   const handleSave = () => {
