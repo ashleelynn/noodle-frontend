@@ -15,6 +15,14 @@ export default function DrawingPreview({
 
   return (
     <div className="h-screen w-screen bg-[#f4f1ed] relative overflow-hidden flex flex-col">
+      {/* SVG filter for hand-drawn/pencil-grain borders */}
+      <svg width="0" height="0" className="absolute">
+        <filter id="pencil-border">
+          <feTurbulence type="turbulence" baseFrequency="0.03" numOctaves="4" seed="1" result="noise" />
+          <feDisplacementMap in="SourceGraphic" in2="noise" scale="3" xChannelSelector="R" yChannelSelector="G" />
+        </filter>
+      </svg>
+
       {/* Banner */}
       <div className="w-full h-[81px] bg-[#ffd000] shrink-0 flex items-center justify-between px-8">
         <p className="text-black" style={{ ...font, fontSize: '50px', lineHeight: 'normal' }}>
@@ -48,13 +56,15 @@ export default function DrawingPreview({
       <div className="flex justify-end px-4 pb-4">
         <button
           onClick={onDone}
-          className="px-8 py-2 bg-white border-2 border-black cursor-pointer
+          className="w-[220px] h-[88px] bg-white border-[6px] border-black cursor-pointer
+            flex items-center justify-center
             hover:bg-gray-100 active:scale-95 transition-all duration-200"
           style={{
             ...font,
-            fontSize: '40px',
-            lineHeight: '16px',
+            fontSize: '56px',
+            lineHeight: '20px',
             color: '#040000',
+            filter: 'url(#pencil-border)',
           }}
         >
           done

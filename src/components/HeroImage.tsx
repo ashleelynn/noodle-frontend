@@ -3,7 +3,7 @@ export default function HeroImage() {
     <img
       src="/pencil-noodle.png"
       alt="Pencil with noodle doodle"
-      className="w-[460px] max-w-[80vw] h-auto"
+      className="w-[600px] max-w-[90vw] h-auto"
     />
   );
 }

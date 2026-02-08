@@ -17,6 +17,14 @@ export default function Login({ onLogin, onSignUp }: LoginProps) {
 
   return (
     <div className="h-screen w-screen bg-[#f4f1ed] relative overflow-hidden flex flex-col">
+      {/* SVG filter for hand-drawn/pencil-grain borders */}
+      <svg width="0" height="0" className="absolute">
+        <filter id="pencil-border">
+          <feTurbulence type="turbulence" baseFrequency="0.03" numOctaves="4" seed="1" result="noise" />
+          <feDisplacementMap in="SourceGraphic" in2="noise" scale="3" xChannelSelector="R" yChannelSelector="G" />
+        </filter>
+      </svg>
+
       {/* Banner */}
       <div className="w-full h-[81px] bg-[#ffd000] shrink-0 flex items-center px-8">
         <p
@@ -130,7 +138,7 @@ export default function Login({ onLogin, onSignUp }: LoginProps) {
           {/* Login button */}
           <button
             type="submit"
-            className="mt-2 px-6 py-2 bg-white border-2 border-black
+            className="mt-2 px-6 py-2 bg-white border-4 border-black
               cursor-pointer hover:bg-gray-100 active:scale-95 transition-all duration-200"
             style={{
               color: '#040000',
@@ -140,6 +148,7 @@ export default function Login({ onLogin, onSignUp }: LoginProps) {
               fontStyle: 'normal',
               fontWeight: 400,
               lineHeight: '16px',
+              filter: 'url(#pencil-border)',
             }}
           >
             login

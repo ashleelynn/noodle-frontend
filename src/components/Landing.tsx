@@ -23,6 +23,14 @@ export default function Landing({ onStart }: LandingProps) {
 
   return (
     <div className="h-screen w-screen bg-[#f4f1ed] relative overflow-hidden flex flex-col">
+      {/* SVG filter for hand-drawn/pencil-grain borders */}
+      <svg width="0" height="0" className="absolute">
+        <filter id="pencil-border">
+          <feTurbulence type="turbulence" baseFrequency="0.03" numOctaves="4" seed="1" result="noise" />
+          <feDisplacementMap in="SourceGraphic" in2="noise" scale="3" xChannelSelector="R" yChannelSelector="G" />
+        </filter>
+      </svg>
+
       <Banner />
 
       <div className="flex-1 flex flex-col items-center justify-center -mt-10">

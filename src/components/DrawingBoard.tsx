@@ -58,15 +58,16 @@ export default function DrawingBoard({
       const dpr = window.devicePixelRatio || 1;
       // Save current drawing
       const imageData = canvas.getContext('2d')?.getImageData(0, 0, canvas.width, canvas.height);
+
       canvas.width = rect.width * dpr;
       canvas.height = rect.height * dpr;
       canvas.style.width = rect.width + 'px';
       canvas.style.height = rect.height + 'px';
+
       const ctx = canvas.getContext('2d');
       if (ctx) {
         ctx.scale(dpr, dpr);
-        // Fill white background
-        ctx.fillStyle = '#ffffff';
+        ctx.fillStyle = '#f4f1ed';
         ctx.fillRect(0, 0, rect.width, rect.height);
         // Restore previous drawing if it existed
         if (imageData) {
@@ -116,7 +117,7 @@ export default function DrawingBoard({
     ctx.beginPath();
     ctx.moveTo(lastPos.current.x, lastPos.current.y);
     ctx.lineTo(pos.x, pos.y);
-    ctx.strokeStyle = activeTool === 'eraser' ? '#ffffff' : activeColor;
+    ctx.strokeStyle = activeTool === 'eraser' ? '#f4f1ed' : activeColor;
     ctx.lineWidth = config.width;
     ctx.lineCap = config.cap;
     ctx.globalAlpha = config.opacity;
@@ -142,6 +143,14 @@ export default function DrawingBoard({
 
   return (
     <div className="h-screen w-screen bg-[#f4f1ed] relative overflow-hidden flex flex-col">
+      {/* SVG filter for hand-drawn/pencil-grain borders */}
+      <svg width="0" height="0" className="absolute">
+        <filter id="pencil-border">
+          <feTurbulence type="turbulence" baseFrequency="0.03" numOctaves="4" seed="1" result="noise" />
+          <feDisplacementMap in="SourceGraphic" in2="noise" scale="3" xChannelSelector="R" yChannelSelector="G" />
+        </filter>
+      </svg>
+
       {/* Banner */}
       <div className="w-full h-[81px] bg-[#ffd000] shrink-0 flex items-center justify-between px-8">
         <p
@@ -178,7 +187,7 @@ export default function DrawingBoard({
               className="text-black whitespace-nowrap"
               style={{
                 fontFamily: '"Just Me Again Down Here", cursive',
-                fontSize: '40px',
+                fontSize: '48px',
                 lineHeight: 'normal',
               }}
             >
@@ -197,135 +206,139 @@ export default function DrawingBoard({
         </div>
       </div>
 
-      {/* Main area */}
-      <div className="flex-1 flex relative p-4 pt-6 gap-3 min-h-0">
-        {/* Left toolbar */}
-        <div className="flex flex-col items-center gap-3 shrink-0">
-            <div className="bg-white border-[5px] border-black flex flex-col items-center py-3 px-2 gap-2 w-[70px]">
-              {/* Tool buttons */}
-              {TOOLS.map((tool) => (
-                <button
-                  key={tool.id}
-                  onClick={() => setActiveTool(tool.id)}
-                  className={`w-[50px] h-[50px] flex items-center justify-center cursor-pointer
-                    border-none rounded-sm transition-colors duration-150 p-1
-                    ${activeTool === tool.id ? 'bg-[#ffd000]' : 'bg-transparent hover:bg-gray-100'}`}
-                  title={tool.label}
-                >
-                  <img src={tool.icon} alt={tool.label} className="w-full h-full object-contain" />
-                </button>
-              ))}
+      {/* Full-size canvas (bottom layer) */}
+      <div className="flex-1 relative min-h-0">
+        {/* Hand-drawn border overlay */}
+        <img
+          src="/canvas-border.svg"
+          alt=""
+          className="absolute inset-0 w-full h-full pointer-events-none z-10"
+        />
 
-              {/* Divider */}
-              <div className="w-[50px] h-[2px] bg-black/20" />
-
-              {/* Color swatches */}
-              {COLORS.map((c) => (
-                <button
-                  key={c.color}
-                  onClick={() => {
-                    setActiveColor(c.color);
-                    if (activeTool === 'eraser') setActiveTool('pencil');
-                  }}
-                  className={`w-[36px] h-[36px] flex items-center justify-center cursor-pointer border-2 rounded-sm transition-transform duration-150
-                    ${activeColor === c.color ? 'scale-125 border-black' : 'border-transparent hover:scale-110'}`}
-                  title={c.label}
-                >
-                  <img src={c.icon} alt={c.label} className="w-full h-full object-contain" />
-                </button>
-              ))}
-
-              {/* Color palette picker */}
-              <button
-                onClick={() => {
-                  const input = document.createElement('input');
-                  input.type = 'color';
-                  input.value = activeColor;
-                  input.addEventListener('input', (e) => {
-                    setActiveColor((e.target as HTMLInputElement).value);
-                    if (activeTool === 'eraser') setActiveTool('pencil');
-                  });
-                  input.click();
-                }}
-                className="w-[42px] h-[42px] flex items-center justify-center cursor-pointer border-none bg-transparent hover:scale-110 transition-transform duration-150"
-                title="Choose color"
-              >
-                <img src="/color-palette.svg" alt="Choose color" className="w-full h-full object-contain" />
-              </button>
-            </div>
-          </div>
-
-        {/* Canvas area */}
-        <div className="flex-1 relative min-h-0">
-          {/* Hand-drawn border */}
-          <img
-            src="/canvas-border.svg"
-            alt=""
-            className="absolute inset-0 w-full h-full pointer-events-none z-10"
-            style={{ padding: '0' }}
+        <div className="absolute inset-0">
+          <canvas
+            ref={canvasRef}
+            className="w-full h-full cursor-crosshair"
+            onPointerDown={startDraw}
+            onPointerMove={draw}
+            onPointerUp={endDraw}
+            onPointerLeave={endDraw}
           />
+        </div>
 
-          {/* Drawing prompt — buddy mode only */}
-          {!isFreestyle && (
-            <div className="absolute top-0 left-1/2 -translate-x-1/2 z-20 bg-white border-[4px] border-black px-6 py-3">
-              <p
-                className="text-black text-center"
-                style={{
-                  fontFamily: '"Just Me Again Down Here", cursive',
-                  fontSize: '40px',
-                  lineHeight: 'normal',
-                }}
+        {/* Left toolbar (floating on top) */}
+        <div className="absolute top-4 left-4 z-20">
+          <div
+            className="bg-white border-[5px] border-black flex flex-col items-center py-3 px-2 gap-2 w-[70px]"
+            style={{ filter: 'url(#pencil-border)' }}
+          >
+            {/* Tool buttons */}
+            {TOOLS.map((tool) => (
+              <button
+                key={tool.id}
+                onClick={() => setActiveTool(tool.id)}
+                className={`w-[50px] h-[50px] flex items-center justify-center cursor-pointer
+                  border-none rounded-sm transition-colors duration-150 p-1
+                  ${activeTool === tool.id ? 'bg-[#ffd000]' : 'bg-transparent hover:bg-gray-100'}`}
+                title={tool.label}
               >
-                {drawingPrompt}
-              </p>
-            </div>
-          )}
+                <img src={tool.icon} alt={tool.label} className="w-full h-full object-contain" />
+              </button>
+            ))}
 
-          {/* Actual drawing canvas */}
-          <div className="absolute inset-[20px] overflow-hidden">
-            <canvas
-              ref={canvasRef}
-              className="w-full h-full cursor-crosshair"
-              onPointerDown={startDraw}
-              onPointerMove={draw}
-              onPointerUp={endDraw}
-              onPointerLeave={endDraw}
-            />
+            {/* Divider */}
+            <div className="w-[50px] h-[2px] bg-black/20" />
+
+            {/* Color swatches */}
+            {COLORS.map((c) => (
+              <button
+                key={c.color}
+                onClick={() => {
+                  setActiveColor(c.color);
+                  if (activeTool === 'eraser') setActiveTool('pencil');
+                }}
+                className={`w-[36px] h-[36px] flex items-center justify-center cursor-pointer border-2 rounded-sm transition-transform duration-150
+                  ${activeColor === c.color ? 'scale-125 border-black' : 'border-transparent hover:scale-110'}`}
+                title={c.label}
+              >
+                <img src={c.icon} alt={c.label} className="w-full h-full object-contain" />
+              </button>
+            ))}
+
+            {/* Color palette picker */}
+            <button
+              onClick={() => {
+                const input = document.createElement('input');
+                input.type = 'color';
+                input.value = activeColor;
+                input.addEventListener('input', (e) => {
+                  setActiveColor((e.target as HTMLInputElement).value);
+                  if (activeTool === 'eraser') setActiveTool('pencil');
+                });
+                input.click();
+              }}
+              className="w-[42px] h-[42px] flex items-center justify-center cursor-pointer border-none bg-transparent hover:scale-110 transition-transform duration-150"
+              title="Choose color"
+            >
+              <img src="/color-palette.svg" alt="Choose color" className="w-full h-full object-contain" />
+            </button>
           </div>
         </div>
-      </div>
 
-      {/* Bottom bar */}
-      <div className="flex items-end justify-between px-4 pb-4">
-        {/* Save button */}
-        <button
-          onClick={handleSave}
-          className="px-8 py-2 bg-white border-2 border-black cursor-pointer
-            hover:bg-gray-100 active:scale-95 transition-all duration-200"
-          style={{
-            fontFamily: '"Just Me Again Down Here", cursive',
-            fontSize: '40px',
-            lineHeight: '16px',
-            color: '#040000',
-          }}
-        >
-          save
-        </button>
+        {/* Drawing prompt — buddy mode only (floating on top) */}
+        {!isFreestyle && (
+          <div
+            className="absolute top-4 left-1/2 -translate-x-1/2 z-20 bg-white border-[4px] border-black px-6 py-3"
+            style={{ filter: 'url(#pencil-border)' }}
+          >
+            <p
+              className="text-black text-center"
+              style={{
+                fontFamily: '"Just Me Again Down Here", cursive',
+                fontSize: '48px',
+                lineHeight: 'normal',
+              }}
+            >
+              {drawingPrompt}
+            </p>
+          </div>
+        )}
 
-        {/* AI suggestion box */}
-        <div
-          className="bg-white border-[4px] border-black p-4 max-w-[400px]"
-        >
-          <p
-            className="text-black"
+        {/* Bottom bar (floating on top) */}
+        <div className="absolute bottom-4 left-4 right-4 z-20 flex items-end justify-between pointer-events-none">
+          {/* Save button */}
+          <button
+            onClick={handleSave}
+            className="pointer-events-auto w-[220px] h-[88px] bg-white border-[6px] border-black cursor-pointer
+              flex items-center justify-center
+              hover:bg-gray-100 active:scale-95 transition-all duration-200"
             style={{
               fontFamily: '"Just Me Again Down Here", cursive',
-              fontSize: '36px',
-              lineHeight: 'normal',
+              fontSize: '56px',
+              lineHeight: '20px',
+              color: '#040000',
+              filter: 'url(#pencil-border)',
             }}
           >
-            {aiMessage}
-          </p>
+            save
+          </button>
+
+          {/* AI suggestion box */}
+          <div
+            className="pointer-events-auto w-[560px] min-h-[150px] bg-white border-[6px] border-black p-5"
+            style={{ filter: 'url(#pencil-border)' }}
+          >
+            <p
+              className="text-black"
+              style={{
+                fontFamily: '"Just Me Again Down Here", cursive',
+                fontSize: '52px',
+                lineHeight: 'normal',
+              }}
+            >
+              {aiMessage}
+            </p>
+          </div>
         </div>
       </div>
     </div>
