@@ -1,28 +1,26 @@
 import { useRef, useEffect, useState, useCallback } from 'react';
 
-type Tool = 'pencil' | 'brush' | 'marker' | 'eraser' | 'pen';
+type Tool = 'pen' | 'brush' | 'pencil' | 'eraser';
 
 const TOOL_CONFIG: Record<Tool, { width: number; opacity: number; cap: CanvasLineCap }> = {
-  pencil: { width: 2, opacity: 1, cap: 'round' },
   pen: { width: 4, opacity: 1, cap: 'round' },
   brush: { width: 12, opacity: 0.8, cap: 'round' },
-  marker: { width: 20, opacity: 0.5, cap: 'square' },
+  pencil: { width: 2, opacity: 1, cap: 'round' },
   eraser: { width: 24, opacity: 1, cap: 'round' },
 };
 
-const COLORS = [
-  { color: '#000000', label: 'Black' },
-  { color: '#e50000', label: 'Red' },
-  { color: '#ffd000', label: 'Yellow' },
-  { color: '#0051ff', label: 'Blue' },
-];
-
 const TOOLS: { id: Tool; icon: string; label: string }[] = [
-  { id: 'pencil', icon: '/tool-pencil.svg', label: 'Pencil' },
   { id: 'pen', icon: '/tool-pen.svg', label: 'Pen' },
   { id: 'brush', icon: '/tool-brush.svg', label: 'Brush' },
-  { id: 'marker', icon: '/tool-marker.svg', label: 'Marker' },
+  { id: 'pencil', icon: '/tool-pencil.svg', label: 'Pencil' },
   { id: 'eraser', icon: '/tool-eraser.svg', label: 'Eraser' },
+];
+
+const COLORS = [
+  { color: '#000000', icon: '/color-black.svg', label: 'Black' },
+  { color: '#E21C1C', icon: '/color-red.svg', label: 'Red' },
+  { color: '#FFEE00', icon: '/color-yellow.svg', label: 'Yellow' },
+  { color: '#0062FF', icon: '/color-blue.svg', label: 'Blue' },
 ];
 
 interface DrawingBoardProps {
@@ -44,7 +42,7 @@ export default function DrawingBoard({
   const isDrawing = useRef(false);
   const lastPos = useRef<{ x: number; y: number } | null>(null);
 
-  const [activeTool, setActiveTool] = useState<Tool>('pencil');
+  const [activeTool, setActiveTool] = useState<Tool>('pen');
   const [activeColor, setActiveColor] = useState('#000000');
   const [isFreestyle, setIsFreestyle] = useState(true);
 
@@ -194,14 +192,7 @@ export default function DrawingBoard({
             className="cursor-pointer bg-transparent border-none p-0"
             title="My profile"
           >
-            <svg width="53" height="67" viewBox="0 0 53 67" fill="none">
-              <circle cx="26" cy="12" r="10" stroke="black" strokeWidth="3" fill="none"/>
-              <line x1="26" y1="22" x2="26" y2="50" stroke="black" strokeWidth="3"/>
-              <line x1="26" y1="30" x2="10" y2="42" stroke="black" strokeWidth="3"/>
-              <line x1="26" y1="30" x2="42" y2="42" stroke="black" strokeWidth="3"/>
-              <line x1="26" y1="50" x2="14" y2="65" stroke="black" strokeWidth="3"/>
-              <line x1="26" y1="50" x2="38" y2="65" stroke="black" strokeWidth="3"/>
-            </svg>
+            <img src="/profile.svg" alt="My profile" className="w-[53px] h-[67px] object-contain" />
           </button>
         </div>
       </div>
@@ -210,8 +201,8 @@ export default function DrawingBoard({
       <div className="flex-1 flex relative p-4 pt-6 gap-3 min-h-0">
         {/* Left toolbar */}
         <div className="flex flex-col items-center gap-3 shrink-0">
-            {/* Tool buttons */}
             <div className="bg-white border-[5px] border-black flex flex-col items-center py-3 px-2 gap-2 w-[70px]">
+              {/* Tool buttons */}
               {TOOLS.map((tool) => (
                 <button
                   key={tool.id}
@@ -224,22 +215,44 @@ export default function DrawingBoard({
                   <img src={tool.icon} alt={tool.label} className="w-full h-full object-contain" />
                 </button>
               ))}
-            </div>
 
-            {/* Color swatches */}
-            {COLORS.map((c) => (
+              {/* Divider */}
+              <div className="w-[50px] h-[2px] bg-black/20" />
+
+              {/* Color swatches */}
+              {COLORS.map((c) => (
+                <button
+                  key={c.color}
+                  onClick={() => {
+                    setActiveColor(c.color);
+                    if (activeTool === 'eraser') setActiveTool('pencil');
+                  }}
+                  className={`w-[36px] h-[36px] flex items-center justify-center cursor-pointer border-2 rounded-sm transition-transform duration-150
+                    ${activeColor === c.color ? 'scale-125 border-black' : 'border-transparent hover:scale-110'}`}
+                  title={c.label}
+                >
+                  <img src={c.icon} alt={c.label} className="w-full h-full object-contain" />
+                </button>
+              ))}
+
+              {/* Color palette picker */}
               <button
-                key={c.color}
                 onClick={() => {
-                  setActiveColor(c.color);
-                  if (activeTool === 'eraser') setActiveTool('pencil');
+                  const input = document.createElement('input');
+                  input.type = 'color';
+                  input.value = activeColor;
+                  input.addEventListener('input', (e) => {
+                    setActiveColor((e.target as HTMLInputElement).value);
+                    if (activeTool === 'eraser') setActiveTool('pencil');
+                  });
+                  input.click();
                 }}
-                className={`w-[28px] h-[28px] rounded-full cursor-pointer border-2 transition-transform duration-150
-                  ${activeColor === c.color ? 'scale-125 border-black' : 'border-transparent hover:scale-110'}`}
-                style={{ backgroundColor: c.color }}
-                title={c.label}
-              />
-            ))}
+                className="w-[42px] h-[42px] flex items-center justify-center cursor-pointer border-none bg-transparent hover:scale-110 transition-transform duration-150"
+                title="Choose color"
+              >
+                <img src="/color-palette.svg" alt="Choose color" className="w-full h-full object-contain" />
+              </button>
+            </div>
           </div>
 
         {/* Canvas area */}

@@ -6,6 +6,7 @@ interface LoginProps {
 }
 
 export default function Login({ onLogin, onSignUp }: LoginProps) {
+  const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
 
@@ -75,9 +76,26 @@ export default function Login({ onLogin, onSignUp }: LoginProps) {
 
         {/* Login form */}
         <form onSubmit={handleSubmit} className="flex flex-col items-center mt-8 gap-4 w-full max-w-[357px]">
+          {/* Name field */}
+          <div className="w-full h-[56px] bg-[#eaeaea] rounded-[60px] flex items-center px-4 gap-3">
+            <img src="/Group 1.svg" alt="" className="w-[32px] h-[32px] object-contain" />
+            <input
+              type="text"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="name"
+              className="flex-1 bg-transparent border-none outline-none text-black"
+              style={{
+                fontFamily: '"Just Me Again Down Here", cursive',
+                fontSize: '30px',
+                lineHeight: 'normal',
+              }}
+            />
+          </div>
+
           {/* Email field */}
           <div className="w-full h-[56px] bg-[#eaeaea] rounded-[60px] flex items-center px-4 gap-3">
-            <img src="/mail-icon.png" alt="" className="w-[32px] h-[32px] object-contain" />
+            <img src="/Group 2.svg" alt="" className="w-[32px] h-[32px] object-contain" />
             <input
               type="email"
               value={email}
@@ -94,7 +112,7 @@ export default function Login({ onLogin, onSignUp }: LoginProps) {
 
           {/* Password field */}
           <div className="w-full h-[56px] bg-[#eaeaea] rounded-[60px] flex items-center px-4 gap-3">
-            <img src="/key-icon.png" alt="" className="w-[32px] h-[32px] object-contain" />
+            <img src="/Group 3.svg" alt="" className="w-[32px] h-[32px] object-contain" />
             <input
               type="password"
               value={password}

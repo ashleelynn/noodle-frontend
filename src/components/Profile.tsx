@@ -30,7 +30,7 @@ export default function Profile({ onGoToCanvas, savedDrawings = [] }: ProfilePro
           className="cursor-pointer bg-transparent border-none p-0"
           title="Back to canvas"
         >
-          <img src="/icon-art-bag.svg" alt="Back to canvas" className="w-[70px] h-[50px] object-contain" />
+          <img src="/pallet.png" alt="Back to canvas" className="w-[70px] h-[50px] object-contain" />
         </button>
       </div>
 
@@ -40,14 +40,7 @@ export default function Profile({ onGoToCanvas, savedDrawings = [] }: ProfilePro
         <div className="w-1/2 p-8 pt-12 overflow-y-auto">
           {/* Header */}
           <div className="flex items-center gap-3 mb-6">
-            <svg width="53" height="67" viewBox="0 0 53 67" fill="none" className="shrink-0">
-              <circle cx="26" cy="12" r="10" stroke="black" strokeWidth="3" fill="none"/>
-              <line x1="26" y1="22" x2="26" y2="50" stroke="black" strokeWidth="3"/>
-              <line x1="26" y1="30" x2="10" y2="42" stroke="black" strokeWidth="3"/>
-              <line x1="26" y1="30" x2="42" y2="42" stroke="black" strokeWidth="3"/>
-              <line x1="26" y1="50" x2="14" y2="65" stroke="black" strokeWidth="3"/>
-              <line x1="26" y1="50" x2="38" y2="65" stroke="black" strokeWidth="3"/>
-            </svg>
+            <img src="/profile.svg" alt="" className="w-[53px] h-[67px] object-contain shrink-0" />
             <h1 className="text-black" style={{ ...font, fontSize: '80px', lineHeight: 'normal' }}>
               my profile..
             </h1>
@@ -92,7 +85,7 @@ export default function Profile({ onGoToCanvas, savedDrawings = [] }: ProfilePro
         <div className="w-1/2 p-8 pt-12 overflow-y-auto">
           {/* Header */}
           <div className="flex items-center gap-3 mb-6">
-            <img src="/icon-gallery-frame.svg" alt="" className="w-[80px] h-[80px] object-contain shrink-0" />
+            <img src="/gallery.svg" alt="" className="w-[80px] h-[80px] object-contain shrink-0" />
             <h1 className="text-black" style={{ ...font, fontSize: '80px', lineHeight: 'normal' }}>
               my gallery
             </h1>

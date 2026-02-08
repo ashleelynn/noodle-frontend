@@ -3,13 +3,43 @@ import Landing from './components/Landing'
 import Login from './components/Login'
 import Question from './components/Question'
 import DrawingBoard from './components/DrawingBoard'
+import DrawingPreview from './components/DrawingPreview'
+import ChooseDance from './components/ChooseDance'
 import Profile from './components/Profile'
 
-type Page = 'landing' | 'login' | 'question' | 'drawing' | 'profile'
+type Page = 'landing' | 'login' | 'question' | 'drawing' | 'preview' | 'chooseDance' | 'profile'
 
 export default function App() {
   const [page, setPage] = useState<Page>('landing')
   const [savedDrawings, setSavedDrawings] = useState<string[]>([])
+  const [currentDrawing, setCurrentDrawing] = useState<string>('')
+
+  const handleSave = (dataUrl: string) => {
+    setSavedDrawings((prev) => [...prev, dataUrl])
+    setCurrentDrawing(dataUrl)
+    setPage('preview')
+  }
+
+  if (page === 'chooseDance') {
+    return (
+      <ChooseDance
+        drawingDataUrl={currentDrawing}
+        onSelect={(dance) => {
+          console.log('selected dance:', dance)
+          setPage('drawing')
+        }}
+      />
+    )
+  }
+
+  if (page === 'preview') {
+    return (
+      <DrawingPreview
+        drawingDataUrl={currentDrawing}
+        onDone={() => setPage('chooseDance')}
+      />
+    )
+  }
 
   if (page === 'profile') {
     return (
@@ -23,7 +53,7 @@ export default function App() {
   if (page === 'drawing') {
     return (
       <DrawingBoard
-        onSave={(dataUrl) => setSavedDrawings((prev) => [...prev, dataUrl])}
+        onSave={handleSave}
         onProfile={() => setPage('profile')}
       />
     )
