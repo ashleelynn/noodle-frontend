@@ -20,6 +20,7 @@ export default function Login({ onAuth, onSignUp, isLoading = false, errorMessag
   const [authMode, setAuthMode] = useState<'login' | 'signup'>('login');
   const [localError, setLocalError] = useState('');
   const [loading, setLoading] = useState(false);
+  const isBusy = loading || isLoading;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -239,7 +240,7 @@ export default function Login({ onAuth, onSignUp, isLoading = false, errorMessag
           {/* Login button */}
           <button
             type="submit"
-            disabled={loading}
+            disabled={isBusy}
             className="mt-2 px-6 py-2 bg-white border-4 border-black
               cursor-pointer hover:bg-gray-100 active:scale-95 transition-all duration-200 disabled:opacity-60"
             style={{
@@ -253,7 +254,7 @@ export default function Login({ onAuth, onSignUp, isLoading = false, errorMessag
               filter: 'url(#pencil-border)',
             }}
           >
-            {loading ? 'loading...' : authMode}
+            {isBusy ? 'loading...' : authMode}
           </button>
         </form>
 

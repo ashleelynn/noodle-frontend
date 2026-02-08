@@ -1,15 +1,13 @@
 import { useState } from 'react'
 import Landing from './components/Landing'
 import Login from './components/Login'
-import Question from './components/Question'
+import Question from './components/QuestionWithElevenLabsAgent'
 import DrawMode from './components/DrawMode'
 import DrawingBoard from './components/DrawingBoard'
 import DrawingPreview from './components/DrawingPreview'
-import ChooseDance from './components/ChooseDance'
 import Profile from './components/Profile'
 import {
   createDrawingSession,
-  generateBuddyPromptFromInterests,
   getMyDrawings,
   loginWithBackend,
   registerWithBackend,
@@ -17,19 +15,22 @@ import {
   type AuthUser,
 } from './lib/api'
 
-type Page = 'landing' | 'login' | 'question' | 'drawMode' | 'drawing' | 'preview' | 'chooseDance' | 'profile'
+type Page = 'landing' | 'login' | 'question' | 'drawMode' | 'drawing' | 'preview' | 'profile'
 type DrawingMode = 'freestyle' | 'buddy'
+type SavedDrawing = {
+  dataUrl: string
+  title: string
+}
 
 export default function App() {
   const [page, setPage] = useState<Page>('landing')
-  const [savedDrawings, setSavedDrawings] = useState<string[]>([])
+  const [savedDrawings, setSavedDrawings] = useState<SavedDrawing[]>([])
   const [currentDrawing, setCurrentDrawing] = useState<string>('')
   const [drawingMode, setDrawingMode] = useState<DrawingMode>('freestyle')
   const [authToken, setAuthToken] = useState<string>('')
   const [currentUser, setCurrentUser] = useState<AuthUser | null>(null)
   const [currentSessionId, setCurrentSessionId] = useState<number | null>(null)
-  const [buddyPrompt, setBuddyPrompt] = useState<string>('dinosaur\'s birthday')
-  const [buddyGuideQuestions, setBuddyGuideQuestions] = useState<string[]>([])
+  const [userInterests, setUserInterests] = useState<string[]>(['dinosaurs', 'birthdays', 'cake'])
   const [isLoading, setIsLoading] = useState(false)
   const [errorMessage, setErrorMessage] = useState('')
   const [welcomeTranscript, setWelcomeTranscript] = useState<string>('')
@@ -38,8 +39,17 @@ export default function App() {
     try {
       const drawings = await getMyDrawings(token)
       const mapped = drawings
-        .map((drawing) => drawing.thumbnail_url || drawing.canvas_data)
-        .filter((item): item is string => Boolean(item))
+        .map((drawing) => {
+          const dataUrl = drawing.thumbnail_url || drawing.canvas_data
+          if (!dataUrl) {
+            return null
+          }
+          return {
+            dataUrl,
+            title: drawing.title?.trim() || 'My Drawing',
+          }
+        })
+        .filter((item): item is SavedDrawing => Boolean(item))
       setSavedDrawings(mapped)
     } catch {
       // Keep existing local drawings on fetch failure.
@@ -47,17 +57,25 @@ export default function App() {
   }
 
   const handleSave = async (dataUrl: string) => {
+    setCurrentDrawing(dataUrl)
+    setPage('preview')
+  }
+
+  const handleFinalizeSave = async (title: string) => {
+    const normalizedTitle = title.trim() || 'My Drawing'
+
     if (authToken && currentSessionId) {
       try {
-        await saveDrawing(authToken, currentSessionId, dataUrl, 'My Drawing')
+        await saveDrawing(authToken, currentSessionId, currentDrawing, normalizedTitle)
         await refreshDrawings(authToken)
       } catch {
         // Preserve local flow if backend save fails.
+        setSavedDrawings((prev) => [...prev, { dataUrl: currentDrawing, title: normalizedTitle }])
       }
+    } else {
+      setSavedDrawings((prev) => [...prev, { dataUrl: currentDrawing, title: normalizedTitle }])
     }
-    setSavedDrawings((prev) => [...prev, dataUrl])
-    setCurrentDrawing(dataUrl)
-    setPage('preview')
+    setPage('profile')
   }
 
   const handleAuth = async (payload: {
@@ -91,17 +109,51 @@ export default function App() {
       setDrawingMode(mode)
 
       if (mode === 'buddy') {
-        const inferredInterests = welcomeTranscript
-          .split(/[,\n]/)
-          .map((s) => s.trim())
-          .filter(Boolean)
-          .slice(0, 4)
-        const generated = generateBuddyPromptFromInterests(inferredInterests)
-        setBuddyPrompt(generated.prompt)
-        setBuddyGuideQuestions(generated.guideQuestions)
-      } else {
-        setBuddyPrompt('dinosaur\'s birthday')
-        setBuddyGuideQuestions([])
+        // Use Gemini ROLE 1: Interest Extraction Agent to analyze conversation
+        if (authToken && welcomeTranscript.trim()) {
+          try {
+            const headers: HeadersInit = {
+              'Content-Type': 'application/json',
+            }
+            if (authToken) {
+              headers['Authorization'] = `Bearer ${authToken}`
+            }
+
+            const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:8004'}/api/ai/gemini/extract-interests`, {
+              method: 'POST',
+              headers,
+              body: JSON.stringify({
+                conversation_transcripts: [welcomeTranscript],
+                child_name: currentUser?.username,
+                child_age: 5,
+              }),
+            })
+
+            if (response.ok) {
+              const data = await response.json()
+              console.log('Gemini extracted interests:', data)
+
+              // Use Gemini-extracted interests
+              if (data.interests && data.interests.length > 0) {
+                setUserInterests(data.interests)
+              } else {
+                // Fallback to defaults
+                setUserInterests(['dinosaurs', 'birthdays', 'cake'])
+              }
+            } else {
+              console.warn('Interest extraction failed, using defaults')
+              setUserInterests(['dinosaurs', 'birthdays', 'cake'])
+            }
+          } catch (err) {
+            console.error('Error extracting interests:', err)
+            // Fallback to defaults
+            setUserInterests(['dinosaurs', 'birthdays', 'cake'])
+          }
+        } else {
+          // No transcript or auth token - use defaults
+          console.log('No transcript available, using default interests')
+          setUserInterests(['dinosaurs', 'birthdays', 'cake'])
+        }
       }
 
       if (authToken) {
@@ -117,23 +169,12 @@ export default function App() {
     }
   }
 
-  if (page === 'chooseDance') {
-    return (
-      <ChooseDance
-        drawingDataUrl={currentDrawing}
-        onSelect={(dance) => {
-          console.log('selected dance:', dance)
-          setPage('drawing')
-        }}
-      />
-    )
-  }
-
   if (page === 'preview') {
     return (
       <DrawingPreview
         drawingDataUrl={currentDrawing}
-        onDone={() => setPage('chooseDance')}
+        onBackToDrawing={() => setPage('drawing')}
+        onSave={handleFinalizeSave}
       />
     )
   }
@@ -154,8 +195,9 @@ export default function App() {
     return (
       <DrawingBoard
         initialFreestyle={drawingMode === 'freestyle'}
-        drawingPrompt={drawingMode === 'buddy' ? buddyPrompt : undefined}
-        aiMessage={drawingMode === 'buddy' && buddyGuideQuestions.length > 0 ? buddyGuideQuestions[0] : undefined}
+        authToken={authToken}
+        userInterests={userInterests}
+        userAge={5}
         onSave={handleSave}
         onProfile={() => setPage('profile')}
       />
@@ -172,10 +214,13 @@ export default function App() {
   }
 
   if (page === 'question') {
-    return <Question onContinue={(transcript) => {
-      setWelcomeTranscript(transcript)
-      setPage('drawMode')
-    }} />
+    return <Question
+      authToken={authToken}
+      onContinue={(transcript) => {
+        setWelcomeTranscript(transcript)
+        setPage('drawMode')
+      }}
+    />
   }
 
   if (page === 'login') {

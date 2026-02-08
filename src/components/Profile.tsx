@@ -1,8 +1,13 @@
 import { useState } from 'react';
 
+type SavedDrawing = {
+  dataUrl: string;
+  title: string;
+};
+
 interface ProfileProps {
   onGoToCanvas: () => void;
-  savedDrawings?: string[]; // array of data URLs from saved canvases
+  savedDrawings?: SavedDrawing[];
   username?: string;
   userEmail?: string;
   userInterests?: string;
@@ -108,17 +113,25 @@ export default function Profile({
           <div className="flex-1 min-h-0 overflow-y-auto">
             <div className="grid grid-cols-3 gap-3">
               {savedDrawings.length > 0 ? (
-                savedDrawings.map((dataUrl, i) => (
-                  <div
-                    key={i}
-                    className="aspect-[4/3] border-[5px] border-black bg-white overflow-hidden"
-                    style={{ filter: 'url(#pencil-border)' }}
-                  >
-                    <img
-                      src={dataUrl}
-                      alt={`Drawing ${i + 1}`}
-                      className="w-full h-full object-contain"
-                    />
+                savedDrawings.map((drawing, i) => (
+                  <div key={i} className="flex flex-col gap-1">
+                    <div
+                      className="aspect-[4/3] border-[5px] border-black bg-white overflow-hidden"
+                      style={{ filter: 'url(#pencil-border)' }}
+                    >
+                      <img
+                        src={drawing.dataUrl}
+                        alt={`Drawing ${i + 1}`}
+                        className="w-full h-full object-contain"
+                      />
+                    </div>
+                    <p
+                      className="text-black truncate"
+                      style={{ ...font, fontSize: '28px', lineHeight: '1' }}
+                      title={drawing.title}
+                    >
+                      {drawing.title}
+                    </p>
                   </div>
                 ))
               ) : (

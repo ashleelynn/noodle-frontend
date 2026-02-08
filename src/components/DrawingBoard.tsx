@@ -1,4 +1,5 @@
 import { useRef, useEffect, useState, useCallback } from 'react';
+import { API_BASE } from '../config/api';
 
 type Tool = 'pen' | 'brush' | 'pencil' | 'eraser';
 
@@ -118,20 +119,20 @@ function strokeHitTest(
 }
 
 interface DrawingBoardProps {
-  aiMessage?: string;
-  drawingPrompt?: string;
+  userInterests?: string[]; // Pass user's interests to generate personalized prompts
+  userAge?: number;
+  authToken?: string; // Auth token for API calls
   initialFreestyle?: boolean;
   onSave?: (dataUrl: string) => void;
-  onSpeakMessage?: (message: string) => void;
   onProfile?: () => void;
 }
 
 export default function DrawingBoard({
-  aiMessage = 'start drawing! i\'ll give you tips along the way',
-  drawingPrompt = 'dinosaur\'s birthday',
+  userInterests = ['dinosaurs', 'birthdays', 'cake'], // Default interests
+  userAge = 5,
+  authToken = '',
   initialFreestyle = true,
   onSave,
-  onSpeakMessage,
   onProfile,
 }: DrawingBoardProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -142,16 +143,139 @@ export default function DrawingBoard({
   const strokesRef = useRef<Stroke[]>([]);
   const currentStrokeRef = useRef<Stroke | null>(null);
   const redrawCanvasRef = useRef<() => void>(() => {});
+  const previousQuestionsRef = useRef<string[]>([]);
 
   const [activeTool, setActiveTool] = useState<Tool>('pen');
   const [activeColor, setActiveColor] = useState('#000000');
   const [isFreestyle, setIsFreestyle] = useState(initialFreestyle);
   const [showColorWheel, setShowColorWheel] = useState(false);
   const [isToggleAnimating, setIsToggleAnimating] = useState(false);
+  const [aiMessage, setAiMessage] = useState('start drawing! i\'ll give you tips along the way');
+  const [drawingPrompt, setDrawingPrompt] = useState('thinking...');
+  const [promptGuideQuestions, setPromptGuideQuestions] = useState<string[]>([]);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const isAudioPlayingRef = useRef(false);
 
   useEffect(() => {
     setIsFreestyle(initialFreestyle);
   }, [initialFreestyle]);
+
+  // Fetch Gemini buddy prompt on mount (only for buddy mode)
+  useEffect(() => {
+    const fetchBuddyPrompt = async () => {
+      if (initialFreestyle) return; // Only fetch for buddy mode
+
+      try {
+        console.log('Fetching Gemini buddy prompt...');
+
+        const headers: HeadersInit = {
+          'Content-Type': 'application/json',
+        };
+        if (authToken) {
+          headers['Authorization'] = `Bearer ${authToken}`;
+        }
+
+        const response = await fetch(`${API_BASE}/api/ai/gemini/generate-buddy-prompt`, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({
+            interests: userInterests,
+            age: userAge,
+            previous_prompts: [], // Could track previous prompts
+          }),
+        });
+
+        if (!response.ok) {
+          console.error('Failed to fetch buddy prompt:', response.statusText);
+          return;
+        }
+
+        const data = await response.json();
+        console.log('Gemini buddy prompt:', data);
+
+        if (data.mainPrompt) {
+          setDrawingPrompt(data.mainPrompt);
+        }
+        if (data.guideQuestions) {
+          setPromptGuideQuestions(data.guideQuestions);
+        }
+
+        // Speak the description using ElevenLabs TTS
+        if (data.description && authToken) {
+          try {
+            console.log('[TTS] Fetching audio for prompt description:', data.description.substring(0, 50));
+
+            const ttsHeaders: HeadersInit = {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${authToken}`,
+            };
+
+            const ttsResponse = await fetch(`${API_BASE}/api/voice/text-to-speech`, {
+              method: 'POST',
+              headers: ttsHeaders,
+              body: JSON.stringify({
+                text: data.description,
+                buddy_id: 'luna',
+              }),
+            });
+
+            console.log('[TTS] Response status:', ttsResponse.status);
+
+            if (!ttsResponse.ok) {
+              const errorText = await ttsResponse.text();
+              console.error('[TTS] Error response:', errorText);
+              return;
+            }
+
+            const ttsData = await ttsResponse.json();
+            console.log('[TTS] Received audio URL:', ttsData.audio_url);
+
+            if (ttsData.audio_url) {
+              // Stop any currently playing audio
+              if (audioRef.current) {
+                audioRef.current.pause();
+                audioRef.current.currentTime = 0;
+              } else {
+                audioRef.current = new Audio();
+              }
+
+              isAudioPlayingRef.current = true;
+              audioRef.current.src = `${API_BASE}${ttsData.audio_url}`;
+
+              audioRef.current.onended = () => {
+                console.log('[TTS] Audio playback ended');
+                isAudioPlayingRef.current = false;
+              };
+
+              audioRef.current.onerror = (err) => {
+                console.error('[TTS] Audio element error:', err);
+                isAudioPlayingRef.current = false;
+              };
+
+              try {
+                await audioRef.current.play();
+                console.log('[TTS] Audio playback started successfully');
+              } catch (playErr) {
+                console.error('[TTS] Playback error:', playErr);
+                isAudioPlayingRef.current = false;
+                // Autoplay might be blocked - user needs to interact first
+                if (playErr instanceof Error && playErr.name === 'NotAllowedError') {
+                  console.warn('[TTS] Autoplay blocked by browser. User interaction required.');
+                }
+              }
+            }
+          } catch (err) {
+            console.error('[TTS] Error with TTS for prompt description:', err);
+            setIsAudioPlaying(false);
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching buddy prompt:', error);
+      }
+    };
+
+    fetchBuddyPrompt();
+  }, [initialFreestyle, userInterests, userAge, authToken]);
   const isIpad = (() => {
     if (typeof navigator === 'undefined') return false;
     const ua = navigator.userAgent;
@@ -192,18 +316,175 @@ export default function DrawingBoard({
     return () => window.removeEventListener('resize', resize);
   }, []);
 
-  // Speak AI messages when they change
-  useEffect(() => {
-    if (aiMessage && onSpeakMessage) {
-      onSpeakMessage(aiMessage);
-    }
-  }, [aiMessage, onSpeakMessage]);
-
   useEffect(() => {
     if (!isToggleAnimating) return;
     const timeoutId = window.setTimeout(() => setIsToggleAnimating(false), 180);
     return () => window.clearTimeout(timeoutId);
   }, [isToggleAnimating]);
+
+  // Cleanup audio on unmount
+  useEffect(() => {
+    return () => {
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current = null;
+      }
+      isAudioPlayingRef.current = false;
+    };
+  }, []);
+
+  // Auto-ask questions every 15 seconds
+  useEffect(() => {
+    const askQuestion = async () => {
+      try {
+        const canvas = canvasRef.current;
+        if (!canvas) return;
+
+        // Get canvas as base64
+        const imageBase64 = canvas.toDataURL('image/png');
+
+        // Call Gemini API
+        const headers: HeadersInit = {
+          'Content-Type': 'application/json',
+        };
+        if (authToken) {
+          headers['Authorization'] = `Bearer ${authToken}`;
+        }
+
+        const response = await fetch(`${API_BASE}/api/ai/gemini/ask-drawing-question`, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({
+            image_base64: imageBase64,
+            drawing_context: drawingPrompt,
+            previous_questions: previousQuestionsRef.current,
+          }),
+        });
+
+        if (!response.ok) {
+          console.error('Failed to fetch question:', response.statusText);
+          return;
+        }
+
+        const data = await response.json();
+        console.log('Gemini response:', data);
+
+        // Update AI message - ensure it's never empty
+        const message = data.message?.trim() || data.question?.trim() || 'What are you creating?';
+        setAiMessage(message);
+
+        // Track question to avoid repetition
+        if (data.question) {
+          previousQuestionsRef.current = [...previousQuestionsRef.current, data.question].slice(-5); // Keep last 5
+        }
+      } catch (error) {
+        console.error('Error asking drawing question:', error);
+      }
+    };
+
+    // Ask immediately on mount
+    const initialTimeout = setTimeout(askQuestion, 2000); // Wait 2s before first question
+
+    // Then ask every 15 seconds
+    const interval = setInterval(askQuestion, 15000);
+
+    return () => {
+      clearTimeout(initialTimeout);
+      clearInterval(interval);
+    };
+  }, [drawingPrompt, authToken]);
+
+  // ElevenLabs Text-to-Speech for AI messages
+  useEffect(() => {
+    const speakMessage = async () => {
+      if (!aiMessage || !authToken) {
+        console.log('[TTS] Skipping - no message or auth token');
+        return;
+      }
+
+      // Skip the initial welcome message to avoid speaking immediately on load
+      if (aiMessage === 'start drawing! i\'ll give you tips along the way') {
+        console.log('[TTS] Skipping initial welcome message');
+        return;
+      }
+
+      // Skip if already playing audio to avoid overlapping
+      if (isAudioPlayingRef.current) {
+        console.log('[TTS] Skipping - audio already playing');
+        return;
+      }
+
+      try {
+        console.log('[TTS] Fetching audio for AI message:', aiMessage.substring(0, 50));
+
+        const headers: HeadersInit = {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${authToken}`,
+        };
+
+        const response = await fetch(`${API_BASE}/api/voice/text-to-speech`, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({
+            text: aiMessage,
+            buddy_id: 'luna',
+          }),
+        });
+
+        console.log('[TTS] Response status:', response.status);
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error('[TTS] Request failed:', response.status, errorText);
+          return;
+        }
+
+        const data = await response.json();
+        console.log('[TTS] Received audio URL:', data.audio_url);
+
+        // Play the audio
+        if (data.audio_url) {
+          // Stop any currently playing audio
+          if (audioRef.current) {
+            audioRef.current.pause();
+            audioRef.current.currentTime = 0;
+          } else {
+            audioRef.current = new Audio();
+          }
+
+          isAudioPlayingRef.current = true;
+          audioRef.current.src = `${API_BASE}${data.audio_url}`;
+
+          audioRef.current.onended = () => {
+            console.log('[TTS] Audio playback ended');
+            isAudioPlayingRef.current = false;
+          };
+
+          audioRef.current.onerror = (err) => {
+            console.error('[TTS] Audio element error:', err);
+            isAudioPlayingRef.current = false;
+          };
+
+          try {
+            await audioRef.current.play();
+            console.log('[TTS] Audio playback started successfully');
+          } catch (playErr) {
+            console.error('[TTS] Playback error:', playErr);
+            isAudioPlayingRef.current = false;
+            // Autoplay might be blocked - user needs to interact first
+            if (playErr instanceof Error && playErr.name === 'NotAllowedError') {
+              console.warn('[TTS] Autoplay blocked by browser. User interaction required.');
+            }
+          }
+        }
+      } catch (error) {
+        console.error('[TTS] Error with TTS:', error);
+        isAudioPlayingRef.current = false;
+      }
+    };
+
+    speakMessage();
+  }, [aiMessage, authToken]);
 
   const getCanvasPosFromClient = useCallback((clientX: number, clientY: number) => {
     const canvas = canvasRef.current;
@@ -686,12 +967,42 @@ export default function DrawingBoard({
               className="text-black text-center"
               style={{
                 fontFamily: '"Just Me Again Down Here", cursive',
-                fontSize: '48px',
+                fontSize: '32px',
                 lineHeight: 'normal',
               }}
             >
               {drawingPrompt}
             </p>
+
+            {/* Guide questions from Gemini */}
+            {promptGuideQuestions.length > 0 && (
+              <div className="mt-2 px-4">
+                <p
+                  className="text-black text-center"
+                  style={{
+                    fontFamily: 'Avenir, sans-serif',
+                    fontSize: '13px',
+                    fontWeight: 'bold',
+                    marginBottom: '6px',
+                  }}
+                >
+                  Think about:
+                </p>
+                {promptGuideQuestions.map((question, i) => (
+                  <p
+                    key={i}
+                    className="text-black text-center"
+                    style={{
+                      fontFamily: 'Avenir, sans-serif',
+                      fontSize: '12px',
+                      marginBottom: '3px',
+                    }}
+                  >
+                    • {question}
+                  </p>
+                ))}
+              </div>
+            )}
           </div>
         )}
 
@@ -716,15 +1027,15 @@ export default function DrawingBoard({
 
           {/* AI suggestion box */}
           <div
-            className="pointer-events-auto w-[560px] min-h-[150px] bg-white border-[6px] border-black p-5"
+            className="pointer-events-auto w-[560px] min-h-[120px] bg-white border-[6px] border-black p-4"
             style={{ filter: 'url(#pencil-border)' }}
           >
             <p
               className="text-black"
               style={{
                 fontFamily: '"Just Me Again Down Here", cursive',
-                fontSize: '52px',
-                lineHeight: 'normal',
+                fontSize: '28px',
+                lineHeight: '1.2',
               }}
             >
               {aiMessage}
